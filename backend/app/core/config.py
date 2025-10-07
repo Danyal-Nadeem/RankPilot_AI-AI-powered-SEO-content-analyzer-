@@ -29,6 +29,12 @@ class Settings(BaseSettings):
     # Redis Configuration
     REDIS_URL: str = "redis://localhost:6379/0"
 
+    # JWT Configuration
+    JWT_SECRET_KEY: str = "supersecretaccesskeyforlocaldev"
+    JWT_REFRESH_SECRET_KEY: str = "supersecretrefreshkeyforlocaldev"
+    ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
+    REFRESH_TOKEN_EXPIRE_DAYS: int = 7
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
