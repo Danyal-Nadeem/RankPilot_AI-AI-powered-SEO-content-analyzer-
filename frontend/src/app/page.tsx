@@ -23,7 +23,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { ThemeToggle } from "@/components/theme-toggle"
+import { Navbar } from "@/components/navbar"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 
 export default function Home() {
@@ -100,36 +100,7 @@ export default function Home() {
       <div className="absolute bottom-[-10%] left-[20%] w-[500px] h-[500px] bg-pink-500/10 rounded-full blur-[120px] pointer-events-none -z-10 dark:bg-pink-500/5" />
 
       {/* Header */}
-      <header className="sticky top-0 z-50 w-full border-b border-border bg-background/80 backdrop-blur-md">
-        <div className="container mx-auto px-4 md:px-8 h-16 flex items-center justify-between">
-          <div className="flex items-center gap-2.5">
-            <div className="relative flex items-center justify-center w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 text-white font-bold shadow-md shadow-indigo-500/20">
-              R
-              <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 bg-emerald-500 border-2 border-white rounded-full dark:border-zinc-950 animate-pulse"></span>
-            </div>
-            <span className="text-xl font-bold tracking-tight bg-gradient-to-r from-zinc-900 via-zinc-700 to-zinc-900 dark:from-zinc-100 dark:via-zinc-300 dark:to-zinc-100 bg-clip-text text-transparent">
-              RankPilot<span className="text-indigo-500">.AI</span>
-            </span>
-          </div>
-
-          <nav className="hidden md:flex items-center gap-6 text-sm font-medium text-muted-foreground">
-            <a href="#features" className="hover:text-foreground transition-colors">Features</a>
-            <a href="#demo" className="hover:text-foreground transition-colors">Interactive Demo</a>
-            <a href="#workflow" className="hover:text-foreground transition-colors">Workflow</a>
-            <span className="px-2 py-0.5 text-xs font-semibold text-emerald-600 bg-emerald-500/10 rounded-full dark:text-emerald-400 dark:bg-emerald-500/10">
-              v1.0 Beta
-            </span>
-          </nav>
-
-          <div className="flex items-center gap-3">
-            <ThemeToggle />
-            <Button className="hidden sm:inline-flex bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white shadow-lg shadow-indigo-500/10 border-0 rounded-lg">
-              Launch App
-              <ArrowRight className="ml-1.5 h-4 w-4" />
-            </Button>
-          </div>
-        </div>
-      </header>
+      <Navbar />
 
       {/* Hero Section */}
       <section className="relative pt-20 pb-16 md:pt-28 md:pb-24">
