@@ -4,7 +4,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.core.config import settings
 from app.core.database import db_manager
-from app.routers import health, auth, scrape
+from app.routers import health, auth, scrape, score
 
 # Setup logging config
 logging.basicConfig(
@@ -52,6 +52,7 @@ app.add_middleware(
 app.include_router(health.router, prefix="/api/v1")
 app.include_router(auth.router, prefix="/api/v1")
 app.include_router(scrape.router, prefix="/api/v1")
+app.include_router(score.router, prefix="/api/v1")
 
 
 @app.get("/")
