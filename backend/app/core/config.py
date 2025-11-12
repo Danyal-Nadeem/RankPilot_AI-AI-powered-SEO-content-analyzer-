@@ -35,6 +35,10 @@ class Settings(BaseSettings):
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 15
     REFRESH_TOKEN_EXPIRE_DAYS: int = 7
 
+    # Anthropic / Claude Configuration
+    ANTHROPIC_API_KEY: str = ""
+    CLAUDE_MODEL: str = "claude-3-5-haiku-20241022"
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
