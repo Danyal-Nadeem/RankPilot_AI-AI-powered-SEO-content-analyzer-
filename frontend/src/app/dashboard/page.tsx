@@ -8,7 +8,10 @@ import { ScrapeForm } from "@/components/scrape-form"
 import { ScrapePreview } from "@/components/scrape-preview"
 import { ScoreDashboard } from "@/components/score-dashboard"
 import { AISuggestions } from "@/components/ai-suggestions"
+import { CompetitorForm } from "@/components/competitor-form"
+import { CompetitorDashboard } from "@/components/competitor-dashboard"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { 
@@ -19,7 +22,9 @@ import {
   Crown,
   Gauge,
   TrendingUp,
-  Lightbulb
+  Lightbulb,
+  Globe,
+  Users
 } from "lucide-react"
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000/api/v1"
@@ -39,6 +44,9 @@ export default function Dashboard() {
   const [aiSuggestions, setAiSuggestions] = React.useState<any>(null)
   const [isGeneratingSuggestions, setIsGeneratingSuggestions] = React.useState(false)
   const [aiError, setAiError] = React.useState<string | null>(null)
+
+  // Competitor parameters
+  const [competitorReport, setCompetitorReport] = React.useState<any>(null)
 
   const handleScrapeSuccess = (data: any) => {
     setScrapedData(data)
@@ -122,6 +130,10 @@ export default function Dashboard() {
     }
   }
 
+  const handleCompetitorSuccess = (data: any) => {
+    setCompetitorReport(data)
+  }
+
   return (
     <ProtectedRoute>
       <div className="flex flex-col min-h-screen bg-background text-foreground font-sans">
@@ -166,7 +178,9 @@ export default function Dashboard() {
                   <Search className="w-4 h-4 text-indigo-500" />
                 </div>
                 <div className="flex items-baseline gap-2">
-                  <span className="text-3xl font-black">{scrapedData ? "3" : "2"}</span>
+                  <span className="text-3xl font-black">
+                    {scrapedData || competitorReport ? "3" : "2"}
+                  </span>
                   <span className="text-xs text-muted-foreground">/ 5 scans left</span>
                 </div>
               </CardContent>
@@ -180,11 +194,11 @@ export default function Dashboard() {
                 </div>
                 <div className="flex items-baseline gap-2">
                   <span className="text-3xl font-black text-indigo-500">
-                    {scoreReport ? scoreReport.overall_score : scrapedData ? "83.2" : "81.5"}
+                    {scoreReport ? scoreReport.overall_score : scrapedData ? "83.2" : competitorReport ? "85.0" : "81.5"}
                   </span>
                   <span className="text-xs text-emerald-500 font-bold flex items-center gap-0.5">
                     <TrendingUp className="w-3 h-3" />
-                    {scoreReport ? "+6.8" : scrapedData ? "+5.9" : "+4.2"}
+                    {scoreReport ? "+6.8" : scrapedData ? "+5.9" : competitorReport ? "+7.7" : "+4.2"}
                   </span>
                 </div>
               </CardContent>
@@ -202,7 +216,9 @@ export default function Dashboard() {
                       ? Object.values(scoreReport.breakdown).reduce((acc: number, val: any) => acc + (val.suggestions?.length || 0), 0)
                       : scrapedData 
                         ? "5" 
-                        : "8"
+                        : competitorReport
+                          ? competitorReport.content_gaps?.length || 0
+                          : "8"
                     }
                   </span>
                   <span className="text-xs text-muted-foreground">pending actions</span>
@@ -211,152 +227,195 @@ export default function Dashboard() {
             </Card>
           </div>
 
-          {/* Core URL / Content Scanner */}
-          <Card className="border-border/80 bg-card/50 backdrop-blur-sm shadow-lg">
-            <CardHeader>
-              <CardTitle className="text-lg flex items-center gap-2">
-                <Zap className="w-5 h-5 text-indigo-500 animate-pulse" />
-                Live SEO Audit Console
-              </CardTitle>
-              <CardDescription>
-                Paste your website URL below or submit raw content/drafts directly for parsing and auditing.
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ScrapeForm onScrapeSuccess={handleScrapeSuccess} />
-            </CardContent>
-          </Card>
+          {/* Main Control Console Tabs */}
+          <Tabs defaultValue="audit" className="w-full space-y-6">
+            <TabsList className="grid w-full grid-cols-2 bg-muted/50 p-1 rounded-xl">
+              <TabsTrigger value="audit" className="rounded-lg text-xs font-semibold py-2">
+                <Globe className="w-3.5 h-3.5 mr-2" />
+                Single Page Audit
+              </TabsTrigger>
+              <TabsTrigger value="compare" className="rounded-lg text-xs font-semibold py-2">
+                <Users className="w-3.5 h-3.5 mr-2" />
+                Competitor Comparison
+              </TabsTrigger>
+            </TabsList>
 
-          {/* Render Preview Data */}
-          {scrapedData && (
-            <div className="space-y-6">
-              <ScrapePreview data={scrapedData} />
-
-              {/* Keyword Scoring Parameters Console */}
-              <Card className="border-border/85 bg-card/65 backdrop-blur shadow-lg relative overflow-hidden">
-                <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-indigo-500 to-purple-500"></div>
+            {/* Single Page Audit Tab */}
+            <TabsContent value="audit" className="space-y-6 focus-visible:ring-0 focus-visible:ring-offset-0">
+              <Card className="border-border/80 bg-card/50 backdrop-blur-sm shadow-lg">
                 <CardHeader>
-                  <CardTitle className="text-md flex items-center gap-1.5">
-                    <Sparkles className="w-4.5 h-4.5 text-indigo-500 animate-pulse" />
-                    Configure Focus Keywords
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Zap className="w-5 h-5 text-indigo-500 animate-pulse" />
+                    Live SEO Audit Console
                   </CardTitle>
                   <CardDescription>
-                    To run the SEO Scoring Engine, specify the primary search term you target.
+                    Paste your website URL below or submit raw content/drafts directly for parsing and auditing.
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <form onSubmit={handleCalculateScore} className="space-y-4">
-                    {scoringError && (
-                      <div className="p-3.5 rounded-xl border border-rose-500/20 bg-rose-500/5 text-xs text-rose-600 dark:text-rose-400 font-semibold animate-fade-in">
-                        {scoringError}
-                      </div>
-                    )}
+                  <ScrapeForm onScrapeSuccess={handleScrapeSuccess} />
+                </CardContent>
+              </Card>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                          Primary Focus Keyword
-                        </label>
-                        <Input
-                          placeholder="e.g. SEO optimization workflow"
-                          value={primaryKeyword}
-                          onChange={(e) => setPrimaryKeyword(e.target.value)}
-                          disabled={isScoring}
-                          className="h-10 rounded-lg bg-background/50 border-border focus-visible:ring-indigo-500/50"
-                        />
-                      </div>
+              {/* Render Preview Data */}
+              {scrapedData && (
+                <div className="space-y-6">
+                  <ScrapePreview data={scrapedData} />
 
-                      <div className="space-y-1.5">
-                        <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
-                          Semantic LSI Keywords (comma separated)
-                        </label>
-                        <Input
-                          placeholder="e.g. keyword audit, scraping logs, domain rank"
-                          value={lsiKeywordsInput}
-                          onChange={(e) => setLsiKeywordsInput(e.target.value)}
-                          disabled={isScoring}
-                          className="h-10 rounded-lg bg-background/50 border-border focus-visible:ring-indigo-500/50"
-                        />
-                      </div>
-                    </div>
+                  {/* Keyword Scoring Parameters Console */}
+                  <Card className="border-border/85 bg-card/65 backdrop-blur shadow-lg relative overflow-hidden">
+                    <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-indigo-500 to-purple-500"></div>
+                    <CardHeader>
+                      <CardTitle className="text-md flex items-center gap-1.5">
+                        <Sparkles className="w-4.5 h-4.5 text-indigo-500 animate-pulse" />
+                        Configure Focus Keywords
+                      </CardTitle>
+                      <CardDescription>
+                        To run the SEO Scoring Engine, specify the primary search term you target.
+                      </CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <form onSubmit={handleCalculateScore} className="space-y-4">
+                        {scoringError && (
+                          <div className="p-3.5 rounded-xl border border-rose-500/20 bg-rose-500/5 text-xs text-rose-600 dark:text-rose-400 font-semibold animate-fade-in">
+                            {scoringError}
+                          </div>
+                        )}
 
-                    <div className="flex justify-end pt-2">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                              Primary Focus Keyword
+                            </label>
+                            <Input
+                              placeholder="e.g. SEO optimization workflow"
+                              value={primaryKeyword}
+                              onChange={(e) => setPrimaryKeyword(e.target.value)}
+                              disabled={isScoring}
+                              className="h-10 rounded-lg bg-background/50 border-border focus-visible:ring-indigo-500/50"
+                            />
+                          </div>
+
+                          <div className="space-y-1.5">
+                            <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                              Semantic LSI Keywords (comma separated)
+                            </label>
+                            <Input
+                              placeholder="e.g. keyword audit, scraping logs, domain rank"
+                              value={lsiKeywordsInput}
+                              onChange={(e) => setLsiKeywordsInput(e.target.value)}
+                              disabled={isScoring}
+                              className="h-10 rounded-lg bg-background/50 border-border focus-visible:ring-indigo-500/50"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="flex justify-end pt-2">
+                          <Button
+                            type="submit"
+                            disabled={isScoring || !primaryKeyword}
+                            className="h-10 px-8 font-semibold bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg min-w-[150px] shadow-lg shadow-indigo-500/10"
+                          >
+                            {isScoring ? (
+                              <span className="flex items-center gap-2">
+                                <Loader2 className="w-4 h-4 animate-spin" />
+                                Calculating...
+                              </span>
+                            ) : (
+                              "Run Scoring Engine"
+                            )}
+                          </Button>
+                        </div>
+                      </form>
+                    </CardContent>
+                  </Card>
+                </div>
+              )}
+
+              {/* Render real score dashboard once loaded */}
+              {scoreReport && (
+                <div className="space-y-8">
+                  <ScoreDashboard report={scoreReport} />
+
+                  {/* Generate AI Suggestions Control Panel */}
+                  <Card className="border-border/80 bg-gradient-to-br from-indigo-500/5 via-purple-500/5 to-transparent backdrop-blur shadow-xl relative overflow-hidden">
+                    <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500"></div>
+                    <CardContent className="pt-8 pb-8 flex flex-col md:flex-row items-center justify-between gap-6">
+                      <div className="space-y-2 text-center md:text-left">
+                        <h3 className="text-xl font-bold flex items-center justify-center md:justify-start gap-2">
+                          <Sparkles className="w-5 h-5 text-indigo-500 animate-pulse" />
+                          AI Content Optimization Engine
+                        </h3>
+                        <p className="text-xs text-muted-foreground max-w-lg">
+                          Generate optimized copy variants, block rewrites, and discover semantic keyword gaps with Claude.
+                        </p>
+                      </div>
                       <Button
-                        type="submit"
-                        disabled={isScoring || !primaryKeyword}
-                        className="h-10 px-8 font-semibold bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg min-w-[150px] shadow-lg shadow-indigo-500/10"
+                        onClick={handleGenerateSuggestions}
+                        disabled={isGeneratingSuggestions}
+                        className="h-11 px-8 font-bold bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-lg shadow-xl shadow-indigo-500/15"
                       >
-                        {isScoring ? (
+                        {isGeneratingSuggestions ? (
                           <span className="flex items-center gap-2">
                             <Loader2 className="w-4 h-4 animate-spin" />
-                            Calculating...
+                            Generating recommendations...
                           </span>
                         ) : (
-                          "Run Scoring Engine"
+                          "Generate AI Suggestions"
                         )}
                       </Button>
+                    </CardContent>
+                  </Card>
+
+                  {aiError && (
+                    <div className="p-3.5 rounded-xl border border-rose-500/20 bg-rose-500/5 text-xs text-rose-600 dark:text-rose-400 font-semibold">
+                      {aiError}
                     </div>
-                  </form>
-                </CardContent>
-              </Card>
-            </div>
-          )}
+                  )}
 
-          {/* Render real score dashboard once loaded */}
-          {scoreReport && (
-            <div className="space-y-8">
-              <ScoreDashboard report={scoreReport} />
-
-              {/* Generate AI Suggestions Control Panel */}
-              <Card className="border-border/80 bg-gradient-to-br from-indigo-500/5 via-purple-500/5 to-transparent backdrop-blur shadow-xl relative overflow-hidden">
-                <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500"></div>
-                <CardContent className="pt-8 pb-8 flex flex-col md:flex-row items-center justify-between gap-6">
-                  <div className="space-y-2 text-center md:text-left">
-                    <h3 className="text-xl font-bold flex items-center justify-center md:justify-start gap-2">
-                      <Sparkles className="w-5 h-5 text-indigo-500 animate-pulse" />
-                      AI Content Optimization Engine
-                    </h3>
-                    <p className="text-xs text-muted-foreground max-w-lg">
-                      Generate optimized copy variants, block rewrites, and discover semantic keyword gaps with Claude.
-                    </p>
-                  </div>
-                  <Button
-                    onClick={handleGenerateSuggestions}
-                    disabled={isGeneratingSuggestions}
-                    className="h-11 px-8 font-bold bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-500 hover:to-purple-500 text-white rounded-lg shadow-xl shadow-indigo-500/15"
-                  >
-                    {isGeneratingSuggestions ? (
-                      <span className="flex items-center gap-2">
-                        <Loader2 className="w-4 h-4 animate-spin" />
-                        Generating recommendations...
-                      </span>
-                    ) : (
-                      "Generate AI Suggestions"
-                    )}
-                  </Button>
-                </CardContent>
-              </Card>
-
-              {aiError && (
-                <div className="p-3.5 rounded-xl border border-rose-500/20 bg-rose-500/5 text-xs text-rose-600 dark:text-rose-400 font-semibold">
-                  {aiError}
+                  {/* Suggestions results display */}
+                  {(aiSuggestions || isGeneratingSuggestions) && (
+                    <div className="space-y-4">
+                      <h3 className="text-lg font-extrabold tracking-tight">AI Optimization Recommendations</h3>
+                      <AISuggestions 
+                        suggestions={aiSuggestions} 
+                        currentTitle={scrapedData?.title} 
+                        currentMeta={scrapedData?.meta_description} 
+                        isLoading={isGeneratingSuggestions} 
+                      />
+                    </div>
+                  )}
                 </div>
               )}
+            </TabsContent>
 
-              {/* Suggestions results display */}
-              {(aiSuggestions || isGeneratingSuggestions) && (
+            {/* Competitor Comparison Tab */}
+            <TabsContent value="compare" className="space-y-6 focus-visible:ring-0 focus-visible:ring-offset-0">
+              <Card className="border-border/80 bg-card/50 backdrop-blur-sm shadow-lg">
+                <CardHeader>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    <Users className="w-5 h-5 text-purple-500" />
+                    Competitor Analysis Center
+                  </CardTitle>
+                  <CardDescription>
+                    Compare your page structure and content metrics with up to 3 competitors in parallel.
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <CompetitorForm onComparisonSuccess={handleCompetitorSuccess} />
+                </CardContent>
+              </Card>
+
+              {/* Renders comparison board */}
+              {competitorReport && (
                 <div className="space-y-4">
-                  <h3 className="text-lg font-extrabold tracking-tight">AI Optimization Recommendations</h3>
-                  <AISuggestions 
-                    suggestions={aiSuggestions} 
-                    currentTitle={scrapedData?.title} 
-                    currentMeta={scrapedData?.meta_description} 
-                    isLoading={isGeneratingSuggestions} 
-                  />
+                  <h3 className="text-lg font-extrabold tracking-tight">Benchmark Insights</h3>
+                  <CompetitorDashboard data={competitorReport} />
                 </div>
               )}
-            </div>
-          )}
+            </TabsContent>
+          </Tabs>
+
         </main>
       </div>
     </ProtectedRoute>
