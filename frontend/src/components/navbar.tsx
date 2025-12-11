@@ -5,7 +5,7 @@ import Link from "next/link"
 import { useAuth } from "@/context/auth-context"
 import { ThemeToggle } from "@/components/theme-toggle"
 import { Button } from "@/components/ui/button"
-import { LogOut, User as UserIcon, LayoutDashboard, Sparkles } from "lucide-react"
+import { LogOut, User as UserIcon, LayoutDashboard, Sparkles, Search } from "lucide-react"
 
 export function Navbar() {
   const { user, isAuthenticated, logout } = useAuth()
@@ -31,6 +31,10 @@ export function Navbar() {
               <Link href="/dashboard" className="hover:text-foreground transition-colors flex items-center gap-1">
                 <LayoutDashboard className="w-4 h-4" />
                 Dashboard
+              </Link>
+              <Link href="/keywords" className="hover:text-foreground transition-colors flex items-center gap-1">
+                <Search className="w-4 h-4" />
+                Keyword Research
               </Link>
             </>
           ) : (
