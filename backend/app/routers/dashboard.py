@@ -2,6 +2,8 @@ import logging
 from urllib.parse import urlparse
 from bson import ObjectId
 from fastapi import APIRouter, Depends, HTTPException, status
+from fastapi.responses import StreamingResponse
+from app.services.pdf_generator import generate_pdf_report
 from app.core.database import db_manager
 from app.core.deps import get_current_user
 from app.models.dashboard import AuditHistoryResponse, AuditHistoryItem, DashboardStatsResponse
@@ -202,3 +204,67 @@ async def delete_report(
     )
 
     return {"message": "Report successfully deleted."}
+
+
+@router.get("/report/{page_id}/export-pdf")
+async def export_pdf_report(
+    page_id: str,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Generate and stream professional PDF SEO audit report.
+    """
+    if db_manager.db is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database connection is offline."
+        )
+
+    try:
+        page_oid = ObjectId(page_id)
+    except Exception:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid page ID format."
+        )
+
+    page_doc = await db_manager.db[COLLECTION_PAGES].find_one(
+        {"_id": page_oid, "user_email": current_user["email"]}
+    )
+
+    if not page_doc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Page report context not found."
+        )
+
+    # Fetch corresponding latest score audit
+    audit_doc = await db_manager.db[COLLECTION_AUDITS].find_one(
+        {"page_id": page_id, "user_email": current_user["email"]},
+        sort=[("scored_at", -1)]
+    )
+
+    if not audit_doc:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail="Score audits not found for this report. Run scoring first."
+        )
+
+    page_doc["id"] = str(page_doc.pop("_id"))
+    audit_doc["id"] = str(audit_doc.pop("_id"))
+
+    try:
+        pdf_buffer = generate_pdf_report(page_doc, audit_doc)
+        filename = f"seo_audit_{page_id}.pdf"
+        return StreamingResponse(
+            pdf_buffer,
+            media_type="application/pdf",
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
+        )
+    except Exception as e:
+        logger.error(f"Failed to generate PDF report: {e}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"PDF generation failed: {str(e)}"
+        )
+
