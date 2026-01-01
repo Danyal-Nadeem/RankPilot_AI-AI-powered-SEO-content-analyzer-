@@ -15,17 +15,17 @@ import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Badge } from "@/components/ui/badge"
-import { 
-  LayoutDashboard, 
-  Globe, 
-  Users, 
-  Search, 
-  Settings as SettingsIcon, 
-  Trash2, 
-  Loader2, 
-  TrendingUp, 
-  Lightbulb, 
-  Gauge, 
+import {
+  LayoutDashboard,
+  Globe,
+  Users,
+  Search,
+  Settings as SettingsIcon,
+  Trash2,
+  Loader2,
+  TrendingUp,
+  Lightbulb,
+  Gauge,
   Sparkles,
   ExternalLink,
   History as HistoryIcon,
@@ -33,7 +33,8 @@ import {
   ChevronLeft,
   ChevronRight,
   BookOpen,
-  Zap
+  Zap,
+  Download
 } from "lucide-react"
 import Link from "next/link"
 
@@ -73,6 +74,10 @@ export default function Dashboard() {
   const [aiSuggestions, setAiSuggestions] = React.useState<any>(null)
   const [isGeneratingSuggestions, setIsGeneratingSuggestions] = React.useState(false)
   const [aiError, setAiError] = React.useState<string | null>(null)
+
+  // PDF Export state
+  const [isExportingPDF, setIsExportingPDF] = React.useState(false)
+  const [pdfError, setPdfError] = React.useState<string | null>(null)
 
   // Competitor state
   const [competitorReport, setCompetitorReport] = React.useState<any>(null)
@@ -160,12 +165,45 @@ export default function Dashboard() {
     }
   }
 
+  const handleExportPDF = async (pageId: string) => {
+    if (!pageId) return
+    setIsExportingPDF(true)
+    setPdfError(null)
+
+    try {
+      const res = await fetch(`${API_URL}/dashboard/report/${pageId}/export-pdf`, {
+        method: "GET",
+        credentials: "include"
+      })
+
+      if (!res.ok) {
+        const data = await res.json()
+        throw new Error(data.detail || "Failed to generate PDF. Make sure report has scores calculated.")
+      }
+
+      const blob = await res.blob()
+      const url = window.URL.createObjectURL(blob)
+      const link = document.createElement("a")
+      link.href = url
+      link.setAttribute("download", `rankpilot_seo_report_${pageId}.pdf`)
+      document.body.appendChild(link)
+      link.click()
+      document.body.removeChild(link)
+      window.URL.revokeObjectURL(url)
+    } catch (err: any) {
+      setPdfError(err.message)
+    } finally {
+      setIsExportingPDF(false)
+    }
+  }
+
   const handleScrapeSuccess = (data: any) => {
     setScrapedData(data)
     setScoreReport(null)
     setAiSuggestions(null)
     setScoringError(null)
     setAiError(null)
+    setPdfError(null)
   }
 
   const handleCalculateScore = async (e: React.FormEvent) => {
@@ -175,6 +213,7 @@ export default function Dashboard() {
     setIsScoring(true)
     setScoringError(null)
     setAiSuggestions(null)
+    setPdfError(null)
 
     const lsiKeywords = lsiKeywordsInput
       .split(",")
@@ -260,20 +299,19 @@ export default function Dashboard() {
         <div className="absolute bottom-[15%] right-[5%] w-[400px] h-[400px] bg-purple-500/5 rounded-full blur-[120px] pointer-events-none -z-10" />
 
         <div className="flex-1 container mx-auto px-4 md:px-8 py-8 max-w-6xl flex flex-col md:flex-row gap-8">
-          
+
           {/* Sidebar Nav section */}
           <aside className="w-full md:w-56 shrink-0 space-y-2">
             <h3 className="px-3 text-[10px] font-bold text-muted-foreground uppercase tracking-widest mb-4">
               Workspace navigation
             </h3>
-            
+
             <button
               onClick={() => { setActiveView("home"); setViewingReportDetails(null); }}
-              className={`w-full px-3.5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2.5 transition-all text-left ${
-                activeView === "home" && !viewingReportDetails
-                  ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/10" 
+              className={`w-full px-3.5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2.5 transition-all text-left ${activeView === "home" && !viewingReportDetails
+                  ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/10"
                   : "hover:bg-muted/15 text-muted-foreground hover:text-foreground"
-              }`}
+                }`}
             >
               <LayoutDashboard className="w-4 h-4" />
               Dashboard Home
@@ -281,11 +319,10 @@ export default function Dashboard() {
 
             <button
               onClick={() => { setActiveView("audit"); setViewingReportDetails(null); }}
-              className={`w-full px-3.5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2.5 transition-all text-left ${
-                activeView === "audit"
-                  ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/10" 
+              className={`w-full px-3.5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2.5 transition-all text-left ${activeView === "audit"
+                  ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/10"
                   : "hover:bg-muted/15 text-muted-foreground hover:text-foreground"
-              }`}
+                }`}
             >
               <Globe className="w-4 h-4" />
               New SEO Audit
@@ -293,11 +330,10 @@ export default function Dashboard() {
 
             <button
               onClick={() => { setActiveView("compare"); setViewingReportDetails(null); }}
-              className={`w-full px-3.5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2.5 transition-all text-left ${
-                activeView === "compare"
-                  ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/10" 
+              className={`w-full px-3.5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2.5 transition-all text-left ${activeView === "compare"
+                  ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/10"
                   : "hover:bg-muted/15 text-muted-foreground hover:text-foreground"
-              }`}
+                }`}
             >
               <Users className="w-4 h-4" />
               Competitor Analysis
@@ -313,11 +349,10 @@ export default function Dashboard() {
 
             <button
               onClick={() => { setActiveView("settings"); setViewingReportDetails(null); }}
-              className={`w-full px-3.5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2.5 transition-all text-left ${
-                activeView === "settings"
-                  ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/10" 
+              className={`w-full px-3.5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2.5 transition-all text-left ${activeView === "settings"
+                  ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/10"
                   : "hover:bg-muted/15 text-muted-foreground hover:text-foreground"
-              }`}
+                }`}
             >
               <SettingsIcon className="w-4 h-4" />
               Portal Settings
@@ -326,7 +361,7 @@ export default function Dashboard() {
 
           {/* Core Contents Viewport */}
           <div className="flex-grow space-y-6">
-            
+
             {/* VIEW 1: Full Report Details Expanded */}
             {viewingReportDetails ? (
               <div className="space-y-6">
@@ -335,15 +370,42 @@ export default function Dashboard() {
                     <h2 className="text-xl font-black">Analysis Archive Report</h2>
                     <span className="text-xs text-muted-foreground font-mono">ID: {viewingReportDetails.page.id}</span>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="xs"
-                    onClick={() => setViewingReportDetails(null)}
-                    className="h-9 px-4 rounded-lg font-semibold hover:bg-muted"
-                  >
-                    Back to History list
-                  </Button>
+                  <div className="flex gap-2">
+                    {viewingReportDetails.audit && (
+                      <Button
+                        onClick={() => handleExportPDF(viewingReportDetails.page.id)}
+                        disabled={isExportingPDF}
+                        className="h-9 px-4 rounded-lg font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow shadow-emerald-500/10"
+                      >
+                        {isExportingPDF ? (
+                          <span className="flex items-center gap-1.5">
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            Exporting...
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-1.5">
+                            <Download className="w-3.5 h-3.5" />
+                            Export PDF
+                          </span>
+                        )}
+                      </Button>
+                    )}
+                    <Button
+                      variant="outline"
+                      size="xs"
+                      onClick={() => setViewingReportDetails(null)}
+                      className="h-9 px-4 rounded-lg font-semibold hover:bg-muted"
+                    >
+                      Back to History list
+                    </Button>
+                  </div>
                 </div>
+
+                {pdfError && (
+                  <div className="p-3.5 rounded-xl border border-rose-500/20 bg-rose-500/5 text-xs text-rose-600 dark:text-rose-400 font-semibold">
+                    {pdfError}
+                  </div>
+                )}
 
                 <ScrapePreview data={viewingReportDetails.page} />
 
@@ -358,7 +420,7 @@ export default function Dashboard() {
             ) : activeView === "home" ? (
               /* VIEW 2: Dashboard stats and historical lists */
               <div className="space-y-6">
-                
+
                 {/* Stats Cards Section */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
                   <Card className="border-border/80 bg-card/30 backdrop-blur-sm">
@@ -463,14 +525,14 @@ export default function Dashboard() {
                           <TableBody>
                             {filteredHistory.map((item) => (
                               <TableRow key={item.page_id} className="hover:bg-muted/10 transition-colors">
-                                <TableCell 
+                                <TableCell
                                   onClick={() => handleLoadFullReport(item.page_id)}
                                   className="pl-5 font-bold text-xs text-indigo-500 cursor-pointer truncate max-w-[150px]"
                                   title={item.title}
                                 >
                                   {item.title}
                                 </TableCell>
-                                <TableCell 
+                                <TableCell
                                   onClick={() => handleLoadFullReport(item.page_id)}
                                   className="text-xs text-muted-foreground cursor-pointer truncate max-w-[180px]"
                                   title={item.url || "Pasted Draft"}
@@ -479,13 +541,12 @@ export default function Dashboard() {
                                 </TableCell>
                                 <TableCell className="text-center">
                                   {item.latest_score !== null ? (
-                                    <span className={`px-2 py-0.5 rounded text-[10px] font-black ${
-                                      item.latest_score >= 80 
-                                        ? "bg-emerald-500/10 text-emerald-500" 
-                                        : item.latest_score >= 50 
-                                          ? "bg-amber-500/10 text-amber-500" 
+                                    <span className={`px-2 py-0.5 rounded text-[10px] font-black ${item.latest_score >= 80
+                                        ? "bg-emerald-500/10 text-emerald-500"
+                                        : item.latest_score >= 50
+                                          ? "bg-amber-500/10 text-amber-500"
                                           : "bg-rose-500/10 text-rose-500"
-                                    }`}>
+                                      }`}>
                                       {item.latest_score}
                                     </span>
                                   ) : (
@@ -650,6 +711,32 @@ export default function Dashboard() {
 
                 {scoreReport && (
                   <div className="space-y-8">
+                    <div className="flex justify-end mb-2">
+                      <Button
+                        onClick={() => handleExportPDF(scoreReport.page_id || scrapedData?.id)}
+                        disabled={isExportingPDF}
+                        className="h-9 px-4 rounded-lg font-semibold bg-emerald-600 hover:bg-emerald-500 text-white shadow shadow-emerald-500/10"
+                      >
+                        {isExportingPDF ? (
+                          <span className="flex items-center gap-1.5">
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            Exporting...
+                          </span>
+                        ) : (
+                          <span className="flex items-center gap-1.5">
+                            <Download className="w-3.5 h-3.5" />
+                            Export PDF
+                          </span>
+                        )}
+                      </Button>
+                    </div>
+
+                    {pdfError && (
+                      <div className="p-3.5 rounded-xl border border-rose-500/20 bg-rose-500/5 text-xs text-rose-600 dark:text-rose-400 font-semibold">
+                        {pdfError}
+                      </div>
+                    )}
+
                     <ScoreDashboard report={scoreReport} />
 
                     <Card className="border-border/80 bg-gradient-to-br from-indigo-500/5 via-purple-500/5 to-transparent backdrop-blur shadow-xl relative overflow-hidden">
@@ -690,11 +777,11 @@ export default function Dashboard() {
                     {(aiSuggestions || isGeneratingSuggestions) && (
                       <div className="space-y-4">
                         <h3 className="text-lg font-extrabold tracking-tight">AI Optimization Recommendations</h3>
-                        <AISuggestions 
-                          suggestions={aiSuggestions} 
-                          currentTitle={scrapedData?.title} 
-                          currentMeta={scrapedData?.meta_description} 
-                          isLoading={isGeneratingSuggestions} 
+                        <AISuggestions
+                          suggestions={aiSuggestions}
+                          currentTitle={scrapedData?.title}
+                          currentMeta={scrapedData?.meta_description}
+                          isLoading={isGeneratingSuggestions}
                         />
                       </div>
                     )}
@@ -771,7 +858,7 @@ export default function Dashboard() {
                 </Card>
               </div>
             )}
-            
+
           </div>
 
         </div>
