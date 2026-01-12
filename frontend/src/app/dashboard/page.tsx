@@ -10,6 +10,7 @@ import { ScoreDashboard } from "@/components/score-dashboard"
 import { AISuggestions } from "@/components/ai-suggestions"
 import { CompetitorForm } from "@/components/competitor-form"
 import { CompetitorDashboard } from "@/components/competitor-dashboard"
+import { BulkScan } from "@/components/bulk-scan"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
@@ -34,7 +35,8 @@ import {
   ChevronRight,
   BookOpen,
   Zap,
-  Download
+  Download,
+  Layers
 } from "lucide-react"
 import Link from "next/link"
 
@@ -50,7 +52,7 @@ interface HistoryItem {
 
 export default function Dashboard() {
   const { user } = useAuth()
-  const [activeView, setActiveView] = React.useState<"home" | "audit" | "compare" | "settings">("home")
+  const [activeView, setActiveView] = React.useState<"home" | "audit" | "bulk" | "compare" | "settings" >("home")
 
   // Stats State
   const [stats, setStats] = React.useState<any>(null)
@@ -326,6 +328,17 @@ export default function Dashboard() {
             >
               <Globe className="w-4 h-4" />
               New SEO Audit
+            </button>
+
+            <button
+              onClick={() => { setActiveView("bulk"); setViewingReportDetails(null); }}
+              className={`w-full px-3.5 py-2.5 rounded-xl text-xs font-bold flex items-center gap-2.5 transition-all text-left ${activeView === "bulk"
+                  ? "bg-indigo-600 text-white shadow-lg shadow-indigo-500/10"
+                  : "hover:bg-muted/15 text-muted-foreground hover:text-foreground"
+                }`}
+            >
+              <Layers className="w-4 h-4" />
+              Bulk SEO Audit
             </button>
 
             <button
@@ -788,8 +801,13 @@ export default function Dashboard() {
                   </div>
                 )}
               </div>
+            ) : activeView === "bulk" ? (
+              /* VIEW 4: Bulk URL Scanning Console */
+              <div className="space-y-6">
+                <BulkScan onLoadReport={(pageId) => handleLoadFullReport(pageId)} />
+              </div>
             ) : activeView === "compare" ? (
-              /* VIEW 4: Competitor comparison tab results */
+              /* VIEW 5: Competitor comparison tab results */
               <div className="space-y-6">
                 <Card className="border-border/80 bg-card/50 backdrop-blur-sm shadow-lg">
                   <CardHeader>
@@ -814,7 +832,7 @@ export default function Dashboard() {
                 )}
               </div>
             ) : (
-              /* VIEW 5: Settings dashboard details card */
+              /* VIEW 6: Settings dashboard details card */
               <div className="space-y-6">
                 <Card className="border-border/80 bg-card/50 backdrop-blur-sm shadow-lg overflow-hidden relative">
                   <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500"></div>
