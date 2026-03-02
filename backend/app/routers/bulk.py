@@ -46,6 +46,7 @@ async def trigger_bulk_analysis(
     job_doc = {
         "user_email": current_user["email"],
         "urls": payload.urls,
+        "primary_keyword": payload.primary_keyword,
         "total_urls": len(payload.urls),
         "completed_urls": 0,
         "status": "processing",

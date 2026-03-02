@@ -144,3 +144,97 @@ def _update_job_progress(db, batch_id: str, result_item: dict):
                 {"_id": job_oid},
                 {"$set": {"status": "completed"}}
             )
+
+            # Dispatch notification email
+            try:
+                user_doc = db["users"].find_one({"email": job["user_email"]})
+                # Default preference to True if not explicit in DB
+                if user_doc and user_doc.get("bulk_completed_email", True):
+                    from app.services.email import send_bulk_scan_completed_email
+                    final_job = db[COLLECTION_JOBS].find_one({"_id": job_oid})
+                    send_bulk_scan_completed_email(
+                        to_email=job["user_email"],
+                        name=user_doc.get("name", "User"),
+                        batch_id=batch_id,
+                        results=final_job.get("results", []),
+                        keyword=job.get("primary_keyword", "N/A")
+                    )
+            except Exception as mail_ex:
+                logger.error(f"Failed sending bulk scan completion email: {mail_ex}")
+
+
+@celery_app.task(name="app.tasks.send_weekly_digest_task")
+def send_weekly_digest_task():
+    """
+    Weekly cron job aggregating SEO audit histories over the past week 
+    and dispatching digest reports to opt-in profiles.
+    """
+    from datetime import timedelta
+    from urllib.parse import urlparse
+    from collections import Counter
+
+    client = None
+    try:
+        client = pymongo.MongoClient(settings.MONGODB_URL)
+        db = client[settings.MONGODB_DB_NAME]
+        
+        users = list(db["users"].find())
+        # We need timezone-aware datetime or naive depending on DB values
+        # MongoDB stores ISO date strings or datetimes, usually timezone naive UTC or aware
+        one_week_ago = datetime.utcnow() - timedelta(days=7)
+        
+        for user in users:
+            # Opt-in check
+            if not user.get("weekly_digest_email", True):
+                continue
+                
+            email = user["email"]
+            name = user.get("name", "User")
+            
+            # Fetch audits for user in the last week
+            audits = list(db[COLLECTION_AUDITS].find({
+                "user_email": email,
+                "scored_at": {"$gte": one_week_ago}
+            }))
+            
+            if not audits:
+                continue
+                
+            total_scans = len(audits)
+            avg_score = round(sum(a["overall_score"] for a in audits) / total_scans)
+            
+            # Find top domains
+            domains = []
+            for a in audits:
+                page_id = a.get("page_id")
+                if page_id:
+                    try:
+                        page = db[COLLECTION_PAGES].find_one({"_id": ObjectId(page_id)})
+                        if page and page.get("source_url"):
+                            domain = urlparse(page["source_url"]).netloc
+                            if domain:
+                                domains.append(domain)
+                    except Exception:
+                        pass
+                        
+            top_domain = Counter(domains).most_common(1)[0][0] if domains else "N/A"
+            
+            stats = {
+                "total_scans": total_scans,
+                "avg_score": avg_score,
+                "top_domain": top_domain
+            }
+            
+            try:
+                from app.services.email import send_weekly_digest_email
+                send_weekly_digest_email(email, name, stats)
+            except Exception as e:
+                logger.error(f"Error sending weekly digest to {email}: {e}")
+                
+    except Exception as e:
+        logger.error(f"Weekly digest cron job failed: {e}")
+    finally:
+        if client:
+            client.close()
+
+
