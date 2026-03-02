@@ -17,3 +17,13 @@ celery_app.conf.update(
 )
 
 celery_app.autodiscover_tasks(["app"])
+
+from celery.schedules import crontab
+
+celery_app.conf.beat_schedule = {
+    "send-weekly-digests": {
+        "task": "app.tasks.send_weekly_digest_task",
+        "schedule": crontab(hour=9, minute=0, day_of_week="monday"),
+    }
+}
+
