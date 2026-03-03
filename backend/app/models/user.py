@@ -7,6 +7,9 @@ class UserBase(BaseModel):
     email: EmailStr
     name: str
     plan: str = "free"  # "free" or "pro"
+    is_verified: bool = False
+    bulk_completed_email: bool = True
+    weekly_digest_email: bool = True
 
 
 class UserCreate(UserBase):
@@ -32,3 +35,9 @@ class UserResponse(UserBase):
 class UserInDB(UserBase):
     hashed_password: str
     created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class NotificationSettingsRequest(BaseModel):
+    bulk_completed_email: bool
+    weekly_digest_email: bool
+
