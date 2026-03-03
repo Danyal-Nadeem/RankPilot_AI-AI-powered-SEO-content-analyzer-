@@ -13,7 +13,11 @@ from app.core.security import (
     hash_password,
     verify_password
 )
-from app.models.user import UserCreate, UserLogin, UserResponse
+from app.models.user import UserCreate, UserLogin, UserResponse, NotificationSettingsRequest
+import uuid
+import logging
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["authentication"])
 
@@ -72,11 +76,16 @@ async def signup(user_in: UserCreate, response: Response):
 
     # Hash password and create record
     hashed = hash_password(user_in.password)
+    verification_token = str(uuid.uuid4())
     user_dict = {
         "email": user_in.email,
         "name": user_in.name,
         "hashed_password": hashed,
         "plan": user_in.plan,
+        "is_verified": False,
+        "verification_token": verification_token,
+        "bulk_completed_email": True,
+        "weekly_digest_email": True,
         "created_at": datetime.now(timezone.utc),
     }
 
@@ -85,6 +94,13 @@ async def signup(user_in: UserCreate, response: Response):
 
     # Issue cookies
     set_auth_cookies(response, user_in.email)
+
+    # Dispatch verification email
+    try:
+        from app.services.email import send_verification_email
+        send_verification_email(user_in.email, user_in.name, verification_token)
+    except Exception as email_err:
+        logger.error(f"Failed sending signup verification email to {user_in.email}: {email_err}")
 
     return user_dict
 
@@ -199,3 +215,90 @@ async def logout(response: Response):
     )
 
     return {"message": "Logged out successfully."}
+
+
+@router.post("/verify", status_code=status.HTTP_200_OK)
+async def verify_email(token: str):
+    """
+    Validate signup email token. Marks user profile as verified.
+    """
+    if db_manager.db is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database connection is offline."
+        )
+
+    user = await db_manager.db["users"].find_one({"verification_token": token})
+    if not user:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Invalid or expired verification token."
+        )
+
+    await db_manager.db["users"].update_one(
+        {"_id": user["_id"]},
+        {"$set": {"is_verified": True, "verification_token": None}}
+    )
+
+    return {"message": "Email address successfully verified!"}
+
+
+@router.post("/resend-verification", status_code=status.HTTP_200_OK)
+async def resend_verification(current_user: dict = Depends(get_current_user)):
+    """
+    Regenerate verification token and resend the email link.
+    """
+    if db_manager.db is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database connection is offline."
+        )
+
+    if current_user.get("is_verified", False):
+        return {"message": "Email is already verified."}
+
+    new_token = str(uuid.uuid4())
+    await db_manager.db["users"].update_one(
+        {"email": current_user["email"]},
+        {"$set": {"verification_token": new_token}}
+    )
+
+    try:
+        from app.services.email import send_verification_email
+        send_verification_email(current_user["email"], current_user.get("name", "User"), new_token)
+    except Exception as email_err:
+        logger.error(f"Failed sending resend verification email: {email_err}")
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Failed to send verification email."
+        )
+
+    return {"message": "Verification link has been resent."}
+
+
+@router.put("/settings/notifications", status_code=status.HTTP_200_OK)
+async def update_notification_settings(
+    payload: NotificationSettingsRequest,
+    current_user: dict = Depends(get_current_user)
+):
+    """
+    Update profile preferences logs in MongoDB.
+    """
+    if db_manager.db is None:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail="Database connection is offline."
+        )
+
+    await db_manager.db["users"].update_one(
+        {"email": current_user["email"]},
+        {
+            "$set": {
+                "bulk_completed_email": payload.bulk_completed_email,
+                "weekly_digest_email": payload.weekly_digest_email
+            }
+        }
+    )
+
+    return {"message": "Notification preferences updated successfully."}
+
