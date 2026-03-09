@@ -39,6 +39,14 @@ class Settings(BaseSettings):
     ANTHROPIC_API_KEY: str = ""
     CLAUDE_MODEL: str = "claude-3-5-haiku-20241022"
 
+    # Email Service Configuration
+    RESEND_API_KEY: str = ""
+    SMTP_HOST: str = ""
+    SMTP_PORT: int = 587
+    SMTP_USER: str = ""
+    SMTP_PASSWORD: str = ""
+    SMTP_FROM: str = "noreply@rankpilot.ai"
+
     model_config = SettingsConfigDict(
         env_file=".env",
         env_file_encoding="utf-8",
