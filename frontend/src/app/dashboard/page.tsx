@@ -36,7 +36,10 @@ import {
   BookOpen,
   Zap,
   Download,
-  Layers
+  Layers,
+  AlertCircle,
+  CheckCircle,
+  Mail
 } from "lucide-react"
 import Link from "next/link"
 
@@ -51,8 +54,8 @@ interface HistoryItem {
 }
 
 export default function Dashboard() {
-  const { user } = useAuth()
-  const [activeView, setActiveView] = React.useState<"home" | "audit" | "bulk" | "compare" | "settings" >("home")
+  const { user, reloadUser } = useAuth()
+  const [activeView, setActiveView] = React.useState<"home" | "audit" | "bulk" | "compare" | "settings">("home")
 
   // Stats State
   const [stats, setStats] = React.useState<any>(null)
@@ -81,12 +84,42 @@ export default function Dashboard() {
   const [isExportingPDF, setIsExportingPDF] = React.useState(false)
   const [pdfError, setPdfError] = React.useState<string | null>(null)
 
+  // Verification state
+  const [verificationSuccess, setVerificationSuccess] = React.useState<string | null>(null)
+  const [verificationError, setVerificationError] = React.useState<string | null>(null)
+  const [isVerifying, setIsVerifying] = React.useState(false)
+  const [resendStatus, setResendStatus] = React.useState<string | null>(null)
+  const [isResending, setIsResending] = React.useState(false)
+
+  // Notification Preferences State
+  const [bulkEmailPref, setBulkEmailPref] = React.useState(true)
+  const [weeklyEmailPref, setWeeklyEmailPref] = React.useState(true)
+  const [isSavingPrefs, setIsSavingPrefs] = React.useState(false)
+  const [prefFeedback, setPrefFeedback] = React.useState<string | null>(null)
+
   // Competitor state
   const [competitorReport, setCompetitorReport] = React.useState<any>(null)
 
   // Expanded report view
   const [viewingReportDetails, setViewingReportDetails] = React.useState<any>(null)
   const [loadingReportDetails, setLoadingReportDetails] = React.useState(false)
+
+  // Sync preferences with user state
+  React.useEffect(() => {
+    if (user) {
+      setBulkEmailPref(user.bulk_completed_email ?? true)
+      setWeeklyEmailPref(user.weekly_digest_email ?? true)
+    }
+  }, [user])
+
+  // Run email verification check on mount
+  React.useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const token = params.get("verify_token")
+    if (token) {
+      handleVerifyEmail(token)
+    }
+  }, [])
 
   // Fetch stats and history on view change or pagination
   React.useEffect(() => {
@@ -95,6 +128,75 @@ export default function Dashboard() {
       fetchHistory(currentPage)
     }
   }, [activeView, currentPage])
+
+  const handleVerifyEmail = async (token: string) => {
+    setIsVerifying(true)
+    setVerificationSuccess(null)
+    setVerificationError(null)
+    try {
+      const res = await fetch(`${API_URL}/auth/verify?token=${token}`, {
+        method: "POST"
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data.detail || "Email verification failed.")
+      }
+      setVerificationSuccess(data.message)
+      reloadUser()
+    } catch (err: any) {
+      setVerificationError(err.message)
+    } finally {
+      setIsVerifying(false)
+    }
+  }
+
+  const handleResendVerification = async () => {
+    setIsResending(true)
+    setResendStatus(null)
+    try {
+      const res = await fetch(`${API_URL}/auth/resend-verification`, {
+        method: "POST",
+        credentials: "include"
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data.detail || "Failed to resend verification link.")
+      }
+      setResendStatus(data.message)
+    } catch (err: any) {
+      setResendStatus(err.message)
+    } finally {
+      setIsResending(false)
+    }
+  }
+
+  const handleSavePreferences = async () => {
+    setIsSavingPrefs(true)
+    setPrefFeedback(null)
+    try {
+      const res = await fetch(`${API_URL}/auth/settings/notifications`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          bulk_completed_email: bulkEmailPref,
+          weekly_digest_email: weeklyEmailPref
+        }),
+        credentials: "include"
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data.detail || "Failed to save preferences.")
+      }
+      setPrefFeedback("Notification preferences updated successfully!")
+      reloadUser()
+    } catch (err: any) {
+      setPrefFeedback(err.message)
+    } finally {
+      setIsSavingPrefs(false)
+    }
+  }
 
   const fetchStats = async () => {
     setLoadingStats(true)
@@ -295,6 +397,51 @@ export default function Dashboard() {
     <ProtectedRoute>
       <div className="flex flex-col min-h-screen bg-background text-foreground font-sans">
         <Navbar />
+
+        {/* Dynamic Verification Banners */}
+        {isVerifying && (
+          <div className="bg-indigo-500/10 border-b border-indigo-500/20 py-2.5 px-4 text-xs font-semibold text-indigo-600 dark:text-indigo-400 flex items-center justify-center gap-2">
+            <Loader2 className="w-4 h-4 animate-spin" />
+            Validating email verification link...
+          </div>
+        )}
+
+        {verificationSuccess && (
+          <div className="bg-emerald-500/10 border-b border-emerald-500/20 py-2.5 px-4 text-xs font-semibold text-emerald-600 dark:text-emerald-400 flex items-center justify-center gap-2">
+            <CheckCircle className="w-4 h-4" />
+            {verificationSuccess}
+          </div>
+        )}
+
+        {verificationError && (
+          <div className="bg-rose-500/10 border-b border-rose-500/20 py-2.5 px-4 text-xs font-semibold text-rose-600 dark:text-rose-400 flex items-center justify-center gap-2">
+            <AlertCircle className="w-4 h-4" />
+            {verificationError}
+          </div>
+        )}
+
+        {user && !user.is_verified && !verificationSuccess && (
+          <div className="bg-amber-500/10 border-b border-amber-500/20 py-2.5 px-4 text-xs font-semibold text-amber-600 dark:text-amber-400 flex items-center justify-between gap-4">
+            <span className="flex items-center gap-1.5">
+              <AlertCircle className="w-4 h-4 text-amber-500" />
+              Your email address is unverified. Please check your inbox for the validation link.
+            </span>
+            <Button
+              variant="outline"
+              onClick={handleResendVerification}
+              disabled={isResending}
+              className="h-7 px-3 text-[10px] rounded border-amber-500/20 text-amber-600 hover:bg-amber-500/10 font-bold"
+            >
+              {isResending ? "Resending..." : "Resend Link"}
+            </Button>
+          </div>
+        )}
+
+        {resendStatus && (
+          <div className="bg-indigo-500/10 border-b border-indigo-500/20 py-2 px-4 text-xs text-center font-bold text-indigo-600 dark:text-indigo-400">
+            {resendStatus}
+          </div>
+        )}
 
         {/* Decorative background orbs */}
         <div className="absolute top-[15%] left-[5%] w-[400px] h-[400px] bg-indigo-500/5 rounded-full blur-[120px] pointer-events-none -z-10" />
@@ -839,7 +986,7 @@ export default function Dashboard() {
                   <CardHeader>
                     <CardTitle className="text-lg flex items-center gap-2">
                       <SettingsIcon className="w-5 h-5 text-indigo-500" />
-                      Portal Settings & Account Options
+                      Portal Settings & Preferences
                     </CardTitle>
                   </CardHeader>
                   <CardContent className="space-y-6">
@@ -856,7 +1003,76 @@ export default function Dashboard() {
                       </Badge>
                     </div>
 
-                    <div className="space-y-2">
+                    {/* Email Notification Preferences Section */}
+                    <div className="space-y-4 border-t border-border/40 pt-4">
+                      <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                        <Mail className="w-4 h-4 text-indigo-500" />
+                        Email Notification Settings
+                      </h4>
+
+                      {prefFeedback && (
+                        <div className="p-3 rounded-lg bg-indigo-500/10 border border-indigo-500/20 text-xs font-semibold text-indigo-600 dark:text-indigo-400">
+                          {prefFeedback}
+                        </div>
+                      )}
+
+                      <div className="space-y-3.5">
+                        <div className="flex items-start justify-between gap-4 p-1">
+                          <div className="space-y-0.5">
+                            <label className="text-xs font-bold block cursor-pointer" htmlFor="bulk-email-pref">
+                              Bulk Scan Completion Emails
+                            </label>
+                            <span className="text-[10px] text-muted-foreground block">
+                              Receive an HTML digest summarizing results as soon as a bulk scanning batch finishes.
+                            </span>
+                          </div>
+                          <input
+                            type="checkbox"
+                            id="bulk-email-pref"
+                            checked={bulkEmailPref}
+                            onChange={(e) => setBulkEmailPref(e.target.checked)}
+                            className="w-4 h-4 rounded border-border text-indigo-600 focus:ring-indigo-500/40 cursor-pointer"
+                          />
+                        </div>
+
+                        <div className="flex items-start justify-between gap-4 p-1">
+                          <div className="space-y-0.5">
+                            <label className="text-xs font-bold block cursor-pointer" htmlFor="weekly-email-pref">
+                              Weekly SEO Performance Digests
+                            </label>
+                            <span className="text-[10px] text-muted-foreground block">
+                              Receive a weekly automated digest summarizing total audits, average scores, and top domains.
+                            </span>
+                          </div>
+                          <input
+                            type="checkbox"
+                            id="weekly-email-pref"
+                            checked={weeklyEmailPref}
+                            onChange={(e) => setWeeklyEmailPref(e.target.checked)}
+                            className="w-4 h-4 rounded border-border text-indigo-600 focus:ring-indigo-500/40 cursor-pointer"
+                          />
+                        </div>
+                      </div>
+
+                      <div className="flex justify-end pt-2">
+                        <Button
+                          onClick={handleSavePreferences}
+                          disabled={isSavingPrefs}
+                          className="h-9 px-6 font-semibold bg-indigo-600 hover:bg-indigo-500 text-white rounded-lg shadow-md shadow-indigo-500/10"
+                        >
+                          {isSavingPrefs ? (
+                            <span className="flex items-center gap-1.5">
+                              <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                              Saving Preferences...
+                            </span>
+                          ) : (
+                            "Save Email Settings"
+                          )}
+                        </Button>
+                      </div>
+                    </div>
+
+                    <div className="space-y-2 border-t border-border/40 pt-4">
                       <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">API Credentials Configuration</h4>
                       <p className="text-xs text-muted-foreground">
                         RankPilot AI utilizes cloud server connections. Ensure your target variables are supplied in the backend configuration (`.env`).
