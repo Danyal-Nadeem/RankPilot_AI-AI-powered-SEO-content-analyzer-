@@ -10,6 +10,9 @@ export interface User {
   email: string
   name: string
   plan: string
+  is_verified?: boolean
+  bulk_completed_email?: boolean
+  weekly_digest_email?: boolean
   created_at: string
 }
 
@@ -22,6 +25,7 @@ interface AuthContextType {
   signup: (name: string, email: string, password: string) => Promise<void>
   logout: () => Promise<void>
   clearError: () => void
+  reloadUser: () => Promise<void>
 }
 
 const AuthContext = React.createContext<AuthContextType | undefined>(undefined)
@@ -170,6 +174,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         signup,
         logout,
         clearError,
+        reloadUser: loadUser
       }}
     >
       {children}
