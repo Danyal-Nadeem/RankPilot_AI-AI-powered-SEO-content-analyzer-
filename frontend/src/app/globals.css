@@ -128,3 +128,38 @@
     @apply font-sans;
   }
 }
+
+/* ── Skeleton shimmer animation ───────────────────────────── */
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 1.6s infinite;
+}
+
+/* ── Mobile responsive helpers ────────────────────────────── */
+@layer utilities {
+  .mobile-padding {
+    @apply px-4 sm:px-6 lg:px-8;
+  }
+
+  .dashboard-grid {
+    @apply grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4;
+  }
+
+  .table-container {
+    @apply w-full overflow-x-auto -mx-4 sm:mx-0 px-4 sm:px-0;
+  }
+
+  .sidebar-mobile-hidden {
+    @apply hidden md:flex;
+  }
+}
+
+/* ── Toast override: ensure above modals ──────────────────── */
+[data-sonner-toaster] {
+  z-index: 9999 !important;
+}
