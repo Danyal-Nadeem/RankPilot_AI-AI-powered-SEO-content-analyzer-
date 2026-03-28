@@ -14,11 +14,17 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 
+from app.core.indexes import create_indexes
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     # Startup: Connect to databases
     logger.info("Starting up FastAPI application...")
     await db_manager.connect()
+    # Create MongoDB indexes
+    if db_manager.db is not None:
+        await create_indexes(db_manager.db)
     yield
     # Shutdown: Close database connections
     logger.info("Shutting down FastAPI application...")
@@ -26,9 +32,48 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(
-    title=settings.APP_NAME,
-    description="AI-powered SEO content analysis and competitor tracking platform API.",
+    title="RankPilot AI",
+    description="""
+## 🚀 RankPilot AI — SEO Content Analysis API
+
+AI-powered SEO content analysis and competitor tracking platform.
+
+### Key Capabilities
+- **URL Scraper**: Extract page metadata, headings, body text, images & links
+- **SEO Scoring**: 7-category weighted audit with actionable suggestions
+- **AI Suggestions**: Claude-generated content improvements and full rewrites
+- **Competitor Analysis**: Side-by-side SEO comparison of two domains
+- **Keyword Research**: LSI keywords, intent classification, search volumes
+- **Bulk Scanning**: Queue up to 20 URLs via background Celery jobs
+- **PDF Export**: Branded SEO report PDF download
+
+### Authentication
+All protected endpoints require a **Bearer JWT token** in the `Authorization` header:
+```
+Authorization: Bearer <access_token>
+```
+Obtain a token via `POST /api/v1/auth/login`.
+""",
     version="1.0.0",
+    contact={
+        "name": "RankPilot AI Support",
+        "url": "https://github.com/your-username/RankPilot_AI",
+    },
+    license_info={
+        "name": "MIT",
+        "url": "https://opensource.org/licenses/MIT",
+    },
+    openapi_tags=[
+        {"name": "health", "description": "Server health check"},
+        {"name": "auth", "description": "Registration, login, JWT tokens, email verification"},
+        {"name": "scrape", "description": "URL scraping — extract page content"},
+        {"name": "score", "description": "SEO audit and scoring"},
+        {"name": "ai", "description": "AI-powered content suggestions and rewrites"},
+        {"name": "competitor", "description": "Competitor domain comparison"},
+        {"name": "keyword", "description": "Keyword research and LSI analysis"},
+        {"name": "dashboard", "description": "Report history, stats, and management"},
+        {"name": "bulk", "description": "Bulk URL scanning with Celery background jobs"},
+    ],
     debug=settings.DEBUG,
     lifespan=lifespan,
 )
