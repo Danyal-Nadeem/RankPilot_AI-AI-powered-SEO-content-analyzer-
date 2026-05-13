@@ -1,9 +1,9 @@
 
 # 🚀 RankPilot AI
 
-**AI-powered SEO content analysis platform** — scrape, score, compare, and optimize content using Claude AI, all from a single dashboard.
+**AI-powered SEO content analysis platform**  scrape, score, compare, and optimize content using Claude AI, all from a single dashboard.
 
-RankPilot AI combines the core workflows of tools like Ahrefs, SEMrush, Grammarly, and ChatGPT into one platform — built for bloggers, marketing agencies, and SaaS content teams who need fast, AI-assisted SEO audits without juggling five different subscriptions.
+RankPilot AI combines the core workflows of tools like Ahrefs, SEMrush, Grammarly, and ChatGPT into one platform  built for bloggers, marketing agencies, and SaaS content teams who need fast, AI-assisted SEO audits without juggling five different subscriptions.
 
 ---
 
@@ -25,7 +25,7 @@ RankPilot AI combines the core workflows of tools like Ahrefs, SEMrush, Grammarl
 
 ## 🌐 Overview
 
-A user pastes a URL or raw content into RankPilot AI. The platform scrapes the page, runs it through a weighted 7-category SEO scoring engine, generates AI-powered rewrite suggestions via Claude, and stores the full report in the user's history — all in a few seconds. Users can also compare their content against up to three competitors, run keyword research, batch-scan up to 20 URLs at once, and export polished PDF reports.
+A user pastes a URL or raw content into RankPilot AI. The platform scrapes the page, runs it through a weighted 7-category SEO scoring engine, generates AI-powered rewrite suggestions via Claude, and stores the full report in the user's history all in a few seconds. Users can also compare their content against up to three competitors, run keyword research, batch-scan up to 20 URLs at once, and export polished PDF reports.
 
 ---
 
