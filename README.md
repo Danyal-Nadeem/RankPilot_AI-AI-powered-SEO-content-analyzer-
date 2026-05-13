@@ -1,325 +1,386 @@
+Haan bilkul — neeche poora README ka raw code hai, ise apne project ke `README.md` mein **copy-paste karke poora purana content replace kar do**:
+
+```markdown
 # 🚀 RankPilot AI
 
-**AI-powered SEO content analysis platform** — analyze URLs or raw content, get AI-generated improvement suggestions, research keywords, track competitor domains, and manage everything from a centralized dashboard.
+**AI-powered SEO content analysis platform** — scrape, score, compare, and optimize content using Claude AI, all from a single dashboard.
 
-> Built for content creators, marketing agencies, and SaaS teams who need Ahrefs + SEMrush + ChatGPT in one place.
+RankPilot AI combines the core workflows of tools like Ahrefs, SEMrush, Grammarly, and ChatGPT into one platform — built for bloggers, marketing agencies, and SaaS content teams who need fast, AI-assisted SEO audits without juggling five different subscriptions.
 
 ---
 
-## ✨ Features
+## 📖 Table of Contents
 
-| Phase | Feature |
-|-------|---------|
-| ✅ 1 | **URL Scraper** — extract title, meta, headings, body text, links, images |
-| ✅ 2 | **SEO Scoring Engine** — 7-category weighted audit (title, meta, readability, headings, keywords, images, links) |
-| ✅ 3 | **AI Suggestions** — Claude-powered content improvement & full article rewrite |
-| ✅ 4 | **Auth System** — JWT access/refresh tokens, email verification |
-| ✅ 5 | **Competitor Analysis** — side-by-side comparison dashboard |
-| ✅ 6 | **Keyword Research** — LSI keywords, intent classification, search volume estimates |
-| ✅ 7 | **Report History** — paginated dashboard with search/filter/sort |
-| ✅ 8 | **PDF Export** — branded PDF with score charts via ReportLab |
-| ✅ 9 | **Bulk URL Scanning** — queue up to 20 URLs via Celery + Upstash Redis |
-| ✅ 10 | **Email Notifications** — Resend API / SMTP + weekly digest cron via Celery Beat |
+- [Overview](#-overview)
+- [Architecture](#-architecture)
+- [Tech Stack](#-tech-stack)
+- [Core Features](#-core-features)
+- [System Flow](#-system-flow)
+- [Project Structure](#-project-structure)
+- [Getting Started](#-getting-started)
+- [Environment Variables](#-environment-variables)
+- [API Overview](#-api-overview)
+- [Deployment](#-deployment)
+- [Contributing](#-contributing)
+
+---
+
+## 🌐 Overview
+
+A user pastes a URL or raw content into RankPilot AI. The platform scrapes the page, runs it through a weighted 7-category SEO scoring engine, generates AI-powered rewrite suggestions via Claude, and stores the full report in the user's history — all in a few seconds. Users can also compare their content against up to three competitors, run keyword research, batch-scan up to 20 URLs at once, and export polished PDF reports.
 
 ---
 
 ## 🏗️ Architecture
 
+```mermaid
+flowchart TB
+    subgraph Client["🖥️ Client Layer"]
+        UI[Next.js 15 Frontend<br/>App Router + TypeScript]
+    end
+
+    subgraph Edge["🔐 Auth & Gateway"]
+        AUTH[JWT Auth Middleware]
+        RATE[Redis Rate Limiter]
+    end
+
+    subgraph API["⚙️ FastAPI Backend"]
+        ROUTER[Routers Layer]
+        SCRAPE[Scraping Service<br/>httpx + BeautifulSoup + Playwright]
+        SCORE[Scoring Engine<br/>7-category weighted audit]
+        AI[AI Suggestions Service<br/>Claude API]
+        COMPARE[Competitor Comparison<br/>asyncio parallel scrape]
+        KEYWORD[Keyword Research<br/>Claude-generated]
+        PDF[PDF Export<br/>WeasyPrint]
+    end
+
+    subgraph Async["⏱️ Background Processing"]
+        CELERY[Celery Workers]
+        BEAT[Celery Beat<br/>Weekly Digest Cron]
+    end
+
+    subgraph Data["💾 Data Layer"]
+        MONGO[(MongoDB Atlas<br/>users, reports, keywords, batches)]
+        REDIS[(Upstash Redis<br/>cache + queue + rate limit)]
+    end
+
+    subgraph External["🌍 External Services"]
+        CLAUDE[Anthropic Claude API]
+        RESEND[Resend Email API]
+        TARGET[Target Websites]
+    end
+
+    UI -->|HTTPS / JWT Cookie| AUTH
+    AUTH --> RATE
+    RATE --> ROUTER
+    ROUTER --> SCRAPE
+    ROUTER --> SCORE
+    ROUTER --> AI
+    ROUTER --> COMPARE
+    ROUTER --> KEYWORD
+    ROUTER --> PDF
+
+    SCRAPE -->|fetch & parse| TARGET
+    SCORE --> MONGO
+    AI -->|generate suggestions| CLAUDE
+    AI -->|cache by content hash| REDIS
+    KEYWORD -->|generate keywords| CLAUDE
+    COMPARE --> SCRAPE
+    COMPARE --> SCORE
+
+    ROUTER -->|queue bulk job| CELERY
+    CELERY --> SCRAPE
+    CELERY --> SCORE
+    CELERY -->|notify| RESEND
+    BEAT -->|weekly trigger| CELERY
+
+    AUTH --> MONGO
+    RATE --> REDIS
+    CELERY --> REDIS
+    CELERY --> MONGO
+
+    style Client fill:#1e3a5f,color:#fff
+    style Edge fill:#5f1e3a,color:#fff
+    style API fill:#1e5f3a,color:#fff
+    style Async fill:#5f5f1e,color:#fff
+    style Data fill:#3a1e5f,color:#fff
+    style External fill:#5f3a1e,color:#fff
 ```
-RankPilot AI
-├── backend/          ← FastAPI (Python 3.13)
-│   ├── app/
-│   │   ├── routers/       ← API route handlers (auth, scrape, score, ai, bulk, ...)
-│   │   ├── services/      ← Business logic (scraper, scoring_engine, ai_suggestions, email, ...)
-│   │   ├── models/        ← Pydantic models (user, scrape, score, keyword, ...)
-│   │   ├── core/          ← DB, config, celery, indexes
-│   │   └── tasks.py       ← Celery task definitions
-│   ├── tests/             ← Pytest unit tests
-│   ├── Procfile           ← Railway deployment
-│   └── requirements.txt
+
+### Layer Breakdown
+
+| Layer | Responsibility |
+|---|---|
+| **Client** | Next.js 15 (App Router) renders the dashboard, auth pages, and analysis forms; talks to the API over HTTPS using httpOnly cookies for tokens |
+| **Edge** | JWT verification middleware + Redis-backed rate limiting protect every authenticated route |
+| **API** | FastAPI routers delegate to focused service modules (scraper, scoring engine, AI suggestions, comparison, keyword research, PDF export) |
+| **Async** | Celery workers handle bulk scans (up to 20 URLs/batch) and scheduled jobs via Celery Beat (weekly digest emails) |
+| **Data** | MongoDB Atlas is the system of record; Upstash Redis handles caching, the Celery broker, and rate-limit counters |
+| **External** | Claude API powers content suggestions and keyword generation; Resend sends transactional and digest emails |
+
+---
+
+## 🧰 Tech Stack
+
+**Frontend**
+- Next.js 15 (App Router, TypeScript, strict mode)
+- Tailwind CSS + shadcn/ui
+- Recharts (score & comparison visualizations)
+- react-hook-form + zod (validation)
+- sonner (toast notifications)
+
+**Backend**
+- FastAPI (Python 3.11, async)
+- Motor (async MongoDB driver)
+- Celery + Celery Beat (background jobs)
+- WeasyPrint (PDF generation)
+- httpx, BeautifulSoup, Playwright (scraping)
+
+**Data & Infra**
+- MongoDB Atlas (free M0 cluster)
+- Upstash Redis (serverless, free tier)
+- Anthropic Claude API (suggestions + keyword research)
+- Resend (transactional email)
+- Railway (backend hosting) + Vercel (frontend hosting)
+
+---
+
+## ✨ Core Features
+
+```mermaid
+mindmap
+  root((RankPilot AI))
+    Content Analysis
+      URL scraping
+      Raw content paste
+      JS-heavy page support
+    SEO Scoring
+      Title & meta scorer
+      Readability Flesch score
+      Keyword density + LSI
+      Image alt coverage
+      Link ratio
+    AI Suggestions
+      Title/meta variants
+      Content rewriting
+      Keyword opportunities
+    Competitor Tools
+      Side-by-side scoring
+      Content gap analysis
+    Keyword Research
+      Long-tail suggestions
+      Intent classification
+    Productivity
+      Bulk URL scanning
+      PDF export
+      Email digests
+      History dashboard
+```
+
+---
+
+## 🔄 System Flow — Single URL Analysis
+
+```mermaid
+sequenceDiagram
+    actor User
+    participant FE as Next.js Frontend
+    participant API as FastAPI
+    participant Scraper as Scraping Service
+    participant Scorer as Scoring Engine
+    participant AI as Claude AI
+    participant DB as MongoDB Atlas
+    participant Cache as Upstash Redis
+
+    User->>FE: Submit URL
+    FE->>API: POST /analyze/scrape
+    API->>Scraper: fetch + parse page
+    Scraper-->>API: title, headings, content, links, images
+    API->>DB: store scraped_pages document
+    API->>Scorer: run 7-category audit
+    Scorer-->>API: per-category scores + overall score
+    API->>Cache: check cache for content hash
+    alt Cache miss
+        API->>AI: generate suggestions
+        AI-->>API: structured JSON suggestions
+        API->>Cache: store response (TTL)
+    else Cache hit
+        Cache-->>API: cached suggestions
+    end
+    API->>DB: save full report
+    API-->>FE: scores + suggestions + report id
+    FE-->>User: render score dashboard + AI tab
+```
+
+---
+
+## 📂 Project Structure
+
+```
+RankPilot_AI/
+├── README.md
+├── CONTRIBUTING.md
 │
-└── frontend/         ← Next.js 16 (TypeScript)
+├── backend/
+│   ├── app/
+│   │   ├── core/
+│   │   │   ├── config.py          # Pydantic settings (env vars)
+│   │   │   ├── database.py        # MongoDB + Redis connections
+│   │   │   ├── security.py        # JWT + password hashing
+│   │   │   ├── deps.py            # auth dependencies
+│   │   │   ├── limiter.py         # rate limiting
+│   │   │   ├── celery_app.py      # Celery + Beat config
+│   │   │   └── indexes.py         # MongoDB index creation
+│   │   ├── models/                # user, scrape, score, keyword, etc.
+│   │   ├── routers/                # auth, scrape, score, ai, competitor,
+│   │   │                            keyword, dashboard, reports, bulk
+│   │   ├── services/                # scraper, scoring_engine, ai_suggestions,
+│   │   │                            competitor, keyword_service,
+│   │   │                            pdf_generator, email
+│   │   ├── tasks.py                # Celery tasks
+│   │   └── main.py                 # FastAPI app entrypoint
+│   ├── tests/
+│   ├── Procfile
+│   ├── railway.json
+│   ├── requirements.txt
+│   └── .env.example
+│
+└── frontend/
     ├── src/
-    │   ├── app/           ← Next.js App Router pages
-    │   ├── components/    ← Reusable UI components
-    │   ├── context/       ← Auth context + state
-    │   └── lib/           ← Utilities, API client
-    └── vercel.json        ← Vercel deployment
-```
-
-**Data flow:**
-```
-Browser → Next.js → FastAPI → (MongoDB Atlas | Upstash Redis)
-                 ↘ Celery Worker → Claude API / Resend API
+    │   ├── app/                    # pages: landing, login, signup,
+    │   │                            dashboard, keywords
+    │   ├── components/             # UI components, score-dashboard,
+    │   │                            ai-suggestions, competitor-*, bulk-scan
+    │   ├── context/                # auth context
+    │   └── lib/                    # utilities
+    ├── vercel.json
+    └── package.json
 ```
 
 ---
 
-## 🛠️ Tech Stack
-
-| Layer | Technology |
-|-------|-----------|
-| **Frontend** | Next.js 16, React 19, TypeScript, TailwindCSS 4 |
-| **UI Components** | shadcn/ui, Radix, Recharts, Lucide Icons |
-| **Toast** | Sonner |
-| **Backend** | FastAPI, Python 3.13, Uvicorn |
-| **Database** | MongoDB Atlas (free M0 cluster) |
-| **Cache/Queue** | Upstash Redis (serverless, `rediss://` TLS) |
-| **Background Jobs** | Celery 5 + Celery Beat |
-| **AI** | Anthropic Claude (`claude-3-5-haiku-20241022`) |
-| **Email** | Resend API (primary) / SMTP (fallback) |
-| **PDF** | ReportLab |
-| **Auth** | JWT (access 15min + refresh 7d) |
-| **Validation** | Pydantic v2, Zod |
-| **Testing** | Pytest 9 |
-| **Deployment** | Railway (backend) + Vercel (frontend) |
-
----
-
-## ⚡ Local Development Setup
+## ⚡ Getting Started
 
 ### Prerequisites
-- Python 3.11+ and `pip`
-- Node.js 18+ and `npm`
-- [MongoDB Atlas](https://cloud.mongodb.com) free M0 cluster
-- [Upstash Redis](https://upstash.com) free serverless instance
+- Node.js 20+
+- Python 3.11+
+- A free [MongoDB Atlas](https://www.mongodb.com/cloud/atlas) cluster
+- A free [Upstash Redis](https://upstash.com/) database
+- An [Anthropic API key](https://console.anthropic.com/)
+- A [Resend API key](https://resend.com/) (free tier: 3,000 emails/month)
 
-### 1. Clone the repo
-
-```bash
-git clone https://github.com/your-username/RankPilot_AI.git
-cd RankPilot_AI
-```
-
-### 2. Backend setup
+### 1. Clone & install
 
 ```bash
+git clone https://github.com/Danyal-Nadeem/RankPilot_AI-AI-powered-SEO-content-analyzer-.git
+cd RankPilot_AI-AI-powered-SEO-content-analyzer-
+
+# Backend
 cd backend
-
-# Create & activate virtual environment
 python -m venv venv
-venv\Scripts\activate          # Windows
-# source venv/bin/activate     # macOS/Linux
-
-# Install dependencies
+source venv/bin/activate   # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 
-# Configure environment
-cp .env.example .env
-# → Fill in MONGODB_URL, REDIS_URL, ANTHROPIC_API_KEY, RESEND_API_KEY
-
-# Start the API server
-uvicorn app.main:app --reload --port 8000
+# Frontend
+cd ../frontend
+npm install
 ```
 
-API docs available at → **http://localhost:8000/docs**
+### 2. Configure environment variables
 
-### 3. Frontend setup
+Copy `.env.example` → `.env` in both `backend/` and `frontend/`, then fill in your credentials (see [Environment Variables](#-environment-variables) below).
+
+### 3. Run locally
 
 ```bash
+# Terminal 1 — backend
+cd backend
+uvicorn app.main:app --reload
+
+# Terminal 2 — Celery worker
+cd backend
+celery -A app.core.celery_app worker --loglevel=info
+
+# Terminal 3 — Celery beat (scheduled jobs)
+cd backend
+celery -A app.core.celery_app beat --loglevel=info
+
+# Terminal 4 — frontend
 cd frontend
-
-npm install
-
-# Configure environment
-echo "NEXT_PUBLIC_API_URL=http://localhost:8000" > .env.local
-
 npm run dev
 ```
 
-App available at → **http://localhost:3000**
-
-### 4. Start Celery worker (for bulk scan & email jobs)
-
-```bash
-cd backend
-venv\Scripts\activate
-
-# Worker
-celery -A app.core.celery_app worker --loglevel=info
-
-# Beat scheduler (weekly digest cron) — separate terminal
-celery -A app.core.celery_app beat --loglevel=info
-```
+Visit `http://localhost:3000`.
 
 ---
 
-## 🧪 Running Tests
+## 🔑 Environment Variables
 
-```bash
-cd backend
-venv\Scripts\activate
-pytest tests/ -v
-```
+**`backend/.env`**
 
-**26 unit tests** covering:
-- `count_syllables` — phoneme counting edge cases
-- `calculate_flesch_reading_ease` — readability scoring
-- `score_title_tag` — SEO title analysis
-- `score_meta_description` — meta tag scoring
-- `generate_seo_audit` — full audit integration
+| Variable | Description |
+|---|---|
+| `MONGODB_URI` | MongoDB Atlas connection string |
+| `REDIS_URL` | Upstash Redis connection URL |
+| `JWT_SECRET_KEY` | Secret for signing JWT tokens |
+| `ANTHROPIC_API_KEY` | Claude API key |
+| `RESEND_API_KEY` | Resend email API key |
+| `CORS_ORIGINS` | Allowed frontend origin(s) |
+
+**`frontend/.env.local`**
+
+| Variable | Description |
+|---|---|
+| `NEXT_PUBLIC_API_URL` | Backend API base URL |
+
+Full annotated examples are in `backend/.env.example` and `frontend/.env.example`.
 
 ---
 
-## 🌍 Environment Variables
+## 📡 API Overview
 
-See [`.env.example`](./backend/.env.example) for a complete reference.
+Interactive docs are auto-generated by FastAPI and available at `/docs` once the backend is running.
 
-### Backend (required)
-
-| Variable | Description |
-|----------|-------------|
-| `MONGODB_URL` | MongoDB Atlas SRV connection string (e.g. `mongodb+srv://user:pass@cluster0.xxxxx.mongodb.net/`) |
-| `MONGODB_DB_NAME` | Database name (default: `rankpilot`) |
-| `REDIS_URL` | Upstash Redis TLS URL (e.g. `rediss://default:xxx@xxx.upstash.io:6379`) |
-| `JWT_SECRET_KEY` | Secret for signing access tokens — use a long random string |
-| `JWT_REFRESH_SECRET_KEY` | Secret for signing refresh tokens |
-| `ANTHROPIC_API_KEY` | Claude API key from [console.anthropic.com](https://console.anthropic.com) |
-
-### Backend (optional — for email)
-
-| Variable | Description |
-|----------|-------------|
-| `RESEND_API_KEY` | Resend API key — free 3000 emails/month at [resend.com](https://resend.com) |
-| `SMTP_HOST` | SMTP server (e.g. `smtp.gmail.com`) |
-| `SMTP_PORT` | SMTP port (default: `587`) |
-| `SMTP_USER` | SMTP username / email address |
-| `SMTP_PASSWORD` | SMTP password or App Password |
-| `SMTP_FROM` | Sender address (default: `noreply@rankpilot.ai`) |
-
-### Frontend
-
-| Variable | Description |
-|----------|-------------|
-| `NEXT_PUBLIC_API_URL` | Backend URL (e.g. `https://rankpilot-backend.up.railway.app`) |
+| Group | Example Endpoints |
+|---|---|
+| **Auth** | `POST /auth/signup`, `POST /auth/login`, `GET /auth/me`, `POST /auth/refresh` |
+| **Scraping** | `POST /analyze/scrape` |
+| **Scoring** | `POST /analyze/score` |
+| **AI Suggestions** | `POST /analyze/ai-suggestions` |
+| **Comparison** | `POST /analyze/compare` |
+| **Keyword Research** | `POST /keywords/research`, `GET /keywords/saved` |
+| **Dashboard** | `GET /reports`, `GET /reports/{id}`, `DELETE /reports/{id}` |
+| **PDF Export** | `GET /reports/{id}/export-pdf` |
+| **Bulk Scan** | `POST /bulk/scan`, `GET /bulk/{job_id}/status` |
 
 ---
 
 ## 🚀 Deployment
 
-### Backend → Railway
-
-1. Create a new project on [Railway.app](https://railway.app)
-2. Connect your GitHub repo → select the `backend/` directory (or set root to `/backend`)
-3. Add all environment variables from the table above in Railway → Variables
-4. Railway auto-detects the `Procfile` and runs:
-   ```
-   uvicorn app.main:app --host 0.0.0.0 --port $PORT
-   ```
-5. *(Optional)* Add a second service for the Celery worker with start command:
-   ```
-   celery -A app.core.celery_app worker --loglevel=info
-   ```
-
-### Frontend → Vercel
-
-1. Import your repo on [Vercel](https://vercel.com)
-2. Set **Root Directory** to `frontend`
-3. Add `NEXT_PUBLIC_API_URL` → your Railway backend URL
-4. Vercel auto-detects Next.js and deploys
-
----
-
-## 📡 API Reference
-
-Interactive Swagger UI is available at `/docs` when the backend is running.
-
-Key endpoints:
-
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| `POST` | `/auth/register` | Register new user |
-| `POST` | `/auth/login` | Login, returns access + refresh tokens |
-| `POST` | `/auth/verify` | Verify email with token |
-| `GET` | `/auth/me` | Get current user profile |
-| `POST` | `/scrape/` | Scrape a URL |
-| `POST` | `/score/` | Run SEO audit on scraped page |
-| `POST` | `/ai/suggestions` | Generate AI content suggestions |
-| `POST` | `/competitor/compare` | Compare two domains |
-| `GET` | `/keyword/research` | Run keyword research |
-| `GET` | `/reports/history` | Paginated report history |
-| `GET` | `/reports/{id}/export-pdf` | Export report as PDF |
-| `POST` | `/bulk/scan` | Submit bulk URL scan job |
-| `GET` | `/bulk/{job_id}/status` | Poll bulk job progress |
-| `GET` | `/stats/aggregate` | Dashboard aggregate stats |
-
----
-
-## 📁 Project Structure
-
+```mermaid
+flowchart LR
+    DEV[Local Dev] -->|git push| GH[GitHub]
+    GH -->|auto-deploy| RAIL[Railway<br/>FastAPI + Celery]
+    GH -->|auto-deploy| VER[Vercel<br/>Next.js]
+    RAIL <-->|connection string| ATLAS[(MongoDB Atlas)]
+    RAIL <-->|connection string| UPSTASH[(Upstash Redis)]
+    VER -->|NEXT_PUBLIC_API_URL| RAIL
 ```
-backend/
-├── app/
-│   ├── core/
-│   │   ├── config.py          ← Pydantic settings (env vars)
-│   │   ├── database.py        ← MongoDB + Redis connection manager
-│   │   ├── celery_app.py      ← Celery + Beat config
-│   │   ├── indexes.py         ← MongoDB index creation
-│   │   └── security.py        ← JWT helpers
-│   ├── models/
-│   │   ├── user.py            ← User document model
-│   │   ├── scrape.py          ← ScrapedPage model
-│   │   ├── score.py           ← ScoreBreakdown, ScoreResponse
-│   │   └── keyword.py         ← KeywordResult model
-│   ├── routers/
-│   │   ├── auth.py            ← /auth/* endpoints
-│   │   ├── scrape.py          ← /scrape/* endpoints
-│   │   ├── score.py           ← /score/* endpoints
-│   │   ├── ai.py              ← /ai/* endpoints
-│   │   ├── competitor.py      ← /competitor/* endpoints
-│   │   ├── keyword.py         ← /keyword/* endpoints
-│   │   ├── reports.py         ← /reports/* + PDF export
-│   │   └── bulk.py            ← /bulk/* endpoints
-│   ├── services/
-│   │   ├── scraper.py         ← BeautifulSoup URL scraper
-│   │   ├── scoring_engine.py  ← SEO scoring algorithms
-│   │   ├── ai_suggestions.py  ← Claude integration
-│   │   ├── competitor.py      ← Competitor comparison logic
-│   │   ├── keyword_service.py ← Keyword research logic
-│   │   ├── pdf_service.py     ← ReportLab PDF generation
-│   │   └── email.py           ← Resend/SMTP email dispatch
-│   ├── tasks.py               ← Celery task definitions
-│   └── main.py                ← FastAPI app factory
-├── tests/
-│   └── test_scoring_engine.py ← 26 unit tests
-├── requirements.txt
-├── Procfile
-├── railway.json
-└── .env.example
 
-frontend/
-├── src/
-│   ├── app/
-│   │   ├── page.tsx           ← Landing page
-│   │   ├── login/page.tsx     ← Login
-│   │   ├── signup/page.tsx    ← Registration
-│   │   ├── dashboard/page.tsx ← Main dashboard
-│   │   └── keywords/page.tsx  ← Keyword research
-│   ├── components/
-│   │   ├── scrape-form.tsx    ← URL input + analysis trigger
-│   │   ├── score-dashboard.tsx← Score breakdown UI
-│   │   ├── ai-suggestions.tsx ← AI suggestions panel
-│   │   ├── competitor-*.tsx   ← Competitor analysis UI
-│   │   ├── bulk-scan.tsx      ← Bulk URL scanner UI
-│   │   ├── error-boundary.tsx ← React error boundary
-│   │   ├── skeletons.tsx      ← Loading skeleton components
-│   │   └── navbar.tsx         ← Top navigation bar
-│   ├── context/
-│   │   └── auth-context.tsx   ← Auth state + token management
-│   └── lib/
-│       └── utils.ts           ← cn(), API helpers
-├── vercel.json
-└── package.json
-```
+1. **Backend → Railway**: connect the `backend/` directory, set environment variables, Railway auto-detects the `Procfile`.
+2. **Frontend → Vercel**: import the `frontend/` directory, set `NEXT_PUBLIC_API_URL` to your Railway backend URL.
+3. **Database & cache**: both MongoDB Atlas and Upstash Redis are cloud-hosted — no local containers needed for production either.
 
 ---
 
 ## 🤝 Contributing
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for guidelines.
+See [CONTRIBUTING.md](./CONTRIBUTING.md) for commit conventions, branching strategy, and the PR checklist.
 
 ---
 
 ## 📄 License
 
-MIT © 2024 RankPilot AI
+This project is provided as-is for portfolio and learning purposes.
+```
+
