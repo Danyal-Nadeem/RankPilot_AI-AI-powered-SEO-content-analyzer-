@@ -1,6 +1,4 @@
-Haan bilkul — neeche poora README ka raw code hai, ise apne project ke `README.md` mein **copy-paste karke poora purana content replace kar do**:
 
-```markdown
 # 🚀 RankPilot AI
 
 **AI-powered SEO content analysis platform** — scrape, score, compare, and optimize content using Claude AI, all from a single dashboard.
@@ -378,9 +376,4 @@ flowchart LR
 See [CONTRIBUTING.md](./CONTRIBUTING.md) for commit conventions, branching strategy, and the PR checklist.
 
 ---
-
-## 📄 License
-
-This project is provided as-is for portfolio and learning purposes.
-```
 
